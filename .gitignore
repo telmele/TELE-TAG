@@ -1,0 +1,40 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+*.whl
+pip-wheel-metadata/
+.installed.cfg
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# TELE-TAG library data — do NOT commit library databases or thumbnails
+**/.teletag/metadata.db
+**/.teletag/metadata.db-wal
+**/.teletag/metadata.db-shm
+**/.teletag/thumbs/
+
+# Logs
+*.log
+logs/
+
+# OS
+Thumbs.db
+desktop.ini
