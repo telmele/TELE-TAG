@@ -23,10 +23,9 @@ logger = logging.getLogger(__name__)
 
 class WatcherSignals(QObject):
     """Signals emitted by the background watchdog handler."""
-    file_added = pyqtSignal(int, str)     # (library_id, abs_path)
-    file_deleted = pyqtSignal(int, str)   # (library_id, relative_path)
+    file_added = pyqtSignal(int, str)       # (library_id, abs_path)
+    file_deleted = pyqtSignal(int, str)     # (library_id, relative_path)
     file_moved = pyqtSignal(int, str, str)  # (library_id, old_rel, new_rel)
-    inbox_file_added = pyqtSignal(str)    # abs_path — watch-folder new file
 
 
 # ---------------------------------------------------------------------------
@@ -85,18 +84,6 @@ class _LibraryHandler(FileSystemEventHandler):
         self._signals.file_moved.emit(self._library.id, old_rel, new_rel)
 
 
-class _WatchFolderHandler(FileSystemEventHandler):
-    def __init__(self, signals: WatcherSignals) -> None:
-        super().__init__()
-        self._signals = signals
-
-    def on_created(self, event: FileSystemEvent) -> None:
-        if event.is_directory:
-            return
-        if Path(event.src_path).suffix.lower() in VIDEO_EXTENSIONS:
-            self._signals.inbox_file_added.emit(str(event.src_path))
-
-
 # ---------------------------------------------------------------------------
 # Manager
 # ---------------------------------------------------------------------------
@@ -116,11 +103,6 @@ class FileWatcher:
         handler = _LibraryHandler(library, self._signals)
         self._observer.schedule(handler, str(library.root_path), recursive=True)
         logger.info("Watching library: %s", library.root_path)
-
-    def watch_folder(self, path: Path) -> None:
-        handler = _WatchFolderHandler(self._signals)
-        self._observer.schedule(handler, str(path), recursive=False)
-        logger.info("Watching inbox folder: %s", path)
 
     def start(self) -> None:
         if not self._started:

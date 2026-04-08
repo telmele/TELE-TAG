@@ -9,10 +9,26 @@ from PyQt6.QtWidgets import (
     QPushButton, QHBoxLayout, QInputDialog, QMessageBox,
 )
 from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtGui import QFont
+from PyQt6.QtGui import QFont, QColor, QBrush
 
 from teletag.core.tags import Tag, get_tags_for_library, build_tag_tree, create_tag, delete_tag
 from teletag.core.library import Library
+
+# Same palette as TagPill — (background, accent/text)
+_PILL_COLORS = [
+    ("#2a1f42", "#a277ff"),
+    ("#152e28", "#61ffca"),
+    ("#2e2010", "#ffca85"),
+    ("#2e1530", "#f694ff"),
+    ("#2e1515", "#ff6767"),
+    ("#152033", "#82e2ff"),
+    ("#1a2e10", "#c3e88d"),
+    ("#2e2a10", "#ffe073"),
+]
+
+
+def _tag_colors(name: str) -> tuple[str, str]:
+    return _PILL_COLORS[hash(name) % len(_PILL_COLORS)]
 
 
 class TagPanel(QWidget):
@@ -96,8 +112,11 @@ class TagPanel(QWidget):
 
     def _make_item(self, tag: Tag) -> QTreeWidgetItem:
         label = f"{tag.name}  ({tag.file_count})" if tag.file_count else tag.name
-        item = QTreeWidgetItem([label])
+        item = QTreeWidgetItem([f"# {label}"])
         item.setData(0, Qt.ItemDataRole.UserRole, tag.id)
+        bg, fg = _tag_colors(tag.name)
+        item.setForeground(0, QBrush(QColor(fg)))
+        item.setBackground(0, QBrush(QColor(bg)))
         for child in tag.children:
             item.addChild(self._make_item(child))
         return item

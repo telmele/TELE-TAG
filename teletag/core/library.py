@@ -78,6 +78,12 @@ def add_library(name: str, root_path: Path) -> Library:
     return lib
 
 
+def rename_library(db_path: Path, library_id: int, new_name: str) -> None:
+    conn = get_connection(db_path)
+    with conn:
+        conn.execute("UPDATE libraries SET name = ? WHERE id = ?", (new_name, library_id))
+
+
 def list_libraries(db_path: Path) -> list[Library]:
     """Return all libraries stored in a given DB."""
     conn = get_connection(db_path)

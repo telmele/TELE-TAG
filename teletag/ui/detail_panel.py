@@ -9,7 +9,7 @@ from pathlib import Path
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QLabel, QFrame,
     QHBoxLayout, QPushButton, QComboBox, QGridLayout,
-    QSizePolicy,
+    QSizePolicy, QScrollArea,
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QFont
@@ -28,6 +28,7 @@ class DetailPanel(QWidget):
         super().__init__(parent)
         self._library: Library | None = None
         self._file_id: int | None = None
+        self._multi_ids: list[int] = []
         self._setup_ui()
         self.setMinimumWidth(220)
         self.setMaximumWidth(320)
@@ -37,12 +38,18 @@ class DetailPanel(QWidget):
         layout.setContentsMargins(8, 8, 8, 8)
         layout.setSpacing(8)
 
+        # ── Single-file panel ──────────────────────────────────────────
+        self._single_widget = QWidget()
+        single_layout = QVBoxLayout(self._single_widget)
+        single_layout.setContentsMargins(0, 0, 0, 0)
+        single_layout.setSpacing(8)
+
         title = QLabel("File Details")
         font = QFont()
         font.setBold(True)
         font.setPointSize(11)
         title.setFont(font)
-        layout.addWidget(title)
+        single_layout.addWidget(title)
 
         self._meta_frame = QFrame()
         self._meta_frame.setFrameShape(QFrame.Shape.StyledPanel)
@@ -52,7 +59,7 @@ class DetailPanel(QWidget):
         self._meta_labels: dict[str, QLabel] = {}
         for row, key in enumerate(["Name", "Duration", "Resolution", "Codec", "Path"]):
             lbl_key = QLabel(key + ":")
-            lbl_key.setStyleSheet("color: #888; font-size: 11px;")
+            lbl_key.setStyleSheet("color: #6d6d7a; font-size: 11px;")
             lbl_val = QLabel("—")
             lbl_val.setWordWrap(True)
             lbl_val.setStyleSheet("font-size: 11px;")
@@ -60,21 +67,19 @@ class DetailPanel(QWidget):
             meta_layout.addWidget(lbl_val, row, 1, Qt.AlignmentFlag.AlignTop)
             self._meta_labels[key] = lbl_val
 
-        layout.addWidget(self._meta_frame)
+        single_layout.addWidget(self._meta_frame)
 
-        # Tags section
         tags_title = QLabel("Tags")
         tags_title.setStyleSheet("font-weight: bold;")
-        layout.addWidget(tags_title)
+        single_layout.addWidget(tags_title)
 
         self._tags_container = QWidget()
         self._tags_layout = QHBoxLayout(self._tags_container)
         self._tags_layout.setContentsMargins(0, 0, 0, 0)
         self._tags_layout.setSpacing(4)
         self._tags_layout.addStretch()
-        layout.addWidget(self._tags_container)
+        single_layout.addWidget(self._tags_container)
 
-        # Add tag row
         add_row = QHBoxLayout()
         self._tag_combo = QComboBox()
         self._tag_combo.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
@@ -82,15 +87,78 @@ class DetailPanel(QWidget):
         btn_add = QPushButton("Add")
         btn_add.clicked.connect(self._on_add_tag)
         add_row.addWidget(btn_add)
-        layout.addLayout(add_row)
+        single_layout.addLayout(add_row)
 
-        # Re-encode button
         self._encode_btn = QPushButton("Re-encode…")
         self._encode_btn.setEnabled(False)
         self._encode_btn.clicked.connect(self._on_encode)
-        layout.addWidget(self._encode_btn)
+        single_layout.addWidget(self._encode_btn)
 
-        layout.addStretch()
+        single_layout.addStretch()
+
+        # ── Multi-file batch panel ─────────────────────────────────────
+        self._batch_widget = QWidget()
+        batch_layout = QVBoxLayout(self._batch_widget)
+        batch_layout.setContentsMargins(0, 0, 0, 0)
+        batch_layout.setSpacing(8)
+
+        batch_title_font = QFont()
+        batch_title_font.setBold(True)
+        batch_title_font.setPointSize(11)
+
+        self._batch_title = QLabel("0 files selected")
+        self._batch_title.setFont(batch_title_font)
+        batch_layout.addWidget(self._batch_title)
+
+        sep = QFrame()
+        sep.setFrameShape(QFrame.Shape.HLine)
+        sep.setStyleSheet("color: #444;")
+        batch_layout.addWidget(sep)
+
+        assign_lbl = QLabel("Assign tag to all selected:")
+        assign_lbl.setStyleSheet("font-weight: bold;")
+        batch_layout.addWidget(assign_lbl)
+
+        assign_row = QHBoxLayout()
+        self._batch_tag_combo = QComboBox()
+        self._batch_tag_combo.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        assign_row.addWidget(self._batch_tag_combo)
+        btn_batch_add = QPushButton("Add")
+        btn_batch_add.clicked.connect(self._on_batch_add_tag)
+        assign_row.addWidget(btn_batch_add)
+        batch_layout.addLayout(assign_row)
+
+        remove_lbl = QLabel("Remove tag from all selected:")
+        remove_lbl.setStyleSheet("font-weight: bold;")
+        batch_layout.addWidget(remove_lbl)
+
+        remove_row = QHBoxLayout()
+        self._batch_remove_combo = QComboBox()
+        self._batch_remove_combo.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        remove_row.addWidget(self._batch_remove_combo)
+        btn_batch_remove = QPushButton("Remove")
+        btn_batch_remove.clicked.connect(self._on_batch_remove_tag)
+        remove_row.addWidget(btn_batch_remove)
+        batch_layout.addLayout(remove_row)
+
+        # Common tags display
+        common_lbl = QLabel("Common tags:")
+        common_lbl.setStyleSheet("font-weight: bold;")
+        batch_layout.addWidget(common_lbl)
+
+        self._batch_tags_container = QWidget()
+        self._batch_tags_layout = QHBoxLayout(self._batch_tags_container)
+        self._batch_tags_layout.setContentsMargins(0, 0, 0, 0)
+        self._batch_tags_layout.setSpacing(4)
+        self._batch_tags_layout.addStretch()
+        batch_layout.addWidget(self._batch_tags_container)
+
+        batch_layout.addStretch()
+
+        # ── Stack both into main layout ────────────────────────────────
+        layout.addWidget(self._single_widget)
+        layout.addWidget(self._batch_widget)
+        self._batch_widget.hide()
 
     # ------------------------------------------------------------------
     # Public
@@ -99,9 +167,30 @@ class DetailPanel(QWidget):
     def set_library(self, library: Library) -> None:
         self._library = library
         self._file_id = None
+        self._multi_ids = []
         self._encode_btn.setEnabled(False)
         self._refresh_tag_combo()
         self._clear_meta()
+
+    def show_selection(self, file_ids: list[int]) -> None:
+        """Called when grid selection changes (single or multi)."""
+        if len(file_ids) == 1:
+            self._single_widget.show()
+            self._batch_widget.hide()
+            self._multi_ids = []
+            self.show_file(file_ids[0])
+        elif len(file_ids) > 1:
+            self._multi_ids = list(file_ids)
+            self._single_widget.hide()
+            self._batch_widget.show()
+            self._refresh_batch()
+        else:
+            self._multi_ids = []
+            self._single_widget.show()
+            self._batch_widget.hide()
+            self._file_id = None
+            self._encode_btn.setEnabled(False)
+            self._clear_meta()
 
     def show_file(self, file_id: int) -> None:
         if self._library is None:
@@ -160,6 +249,12 @@ class DetailPanel(QWidget):
         tags = get_tags_for_library(self._library.db_path, self._library.id)
         for tag in tags:
             self._tag_combo.addItem(tag.name, tag.id)
+        # Keep batch combos in sync.
+        self._batch_tag_combo.clear()
+        self._batch_remove_combo.clear()
+        for tag in tags:
+            self._batch_tag_combo.addItem(tag.name, tag.id)
+            self._batch_remove_combo.addItem(tag.name, tag.id)
 
     def _on_add_tag(self) -> None:
         if self._file_id is None or self._library is None:
@@ -181,3 +276,55 @@ class DetailPanel(QWidget):
     def _on_encode(self) -> None:
         if self._file_id is not None:
             self.encode_requested.emit(self._file_id)
+
+    # ------------------------------------------------------------------
+    # Batch helpers
+    # ------------------------------------------------------------------
+
+    def _refresh_batch(self) -> None:
+        if self._library is None:
+            return
+        n = len(self._multi_ids)
+        self._batch_title.setText(f"{n} files selected")
+
+        # Compute common tags (tags assigned to every selected file).
+        tag_sets = []
+        for fid in self._multi_ids:
+            tags = get_tags_for_file(self._library.db_path, fid)
+            tag_sets.append({t.id for t in tags})
+        common_ids = set.intersection(*tag_sets) if tag_sets else set()
+
+        # Refresh common tags display.
+        while self._batch_tags_layout.count() > 1:
+            item = self._batch_tags_layout.takeAt(0)
+            if item and item.widget():
+                item.widget().deleteLater()
+
+        all_tags = {t.id: t for t in get_tags_for_library(self._library.db_path, self._library.id)}
+        for tid in sorted(common_ids):
+            if tid in all_tags:
+                from teletag.ui.widgets.tag_pill import TagPill
+                pill = TagPill(all_tags[tid].name)
+                self._batch_tags_layout.insertWidget(self._batch_tags_layout.count() - 1, pill)
+
+    def _on_batch_add_tag(self) -> None:
+        if not self._multi_ids or self._library is None:
+            return
+        tag_id = self._batch_tag_combo.currentData()
+        if tag_id is None:
+            return
+        for fid in self._multi_ids:
+            assign_tag(self._library.db_path, fid, tag_id)
+        self._refresh_batch()
+        self.tags_changed.emit()
+
+    def _on_batch_remove_tag(self) -> None:
+        if not self._multi_ids or self._library is None:
+            return
+        tag_id = self._batch_remove_combo.currentData()
+        if tag_id is None:
+            return
+        for fid in self._multi_ids:
+            remove_tag(self._library.db_path, fid, tag_id)
+        self._refresh_batch()
+        self.tags_changed.emit()

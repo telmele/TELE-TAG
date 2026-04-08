@@ -3,21 +3,22 @@ Lazy-loading thumbnail widget.
 
 The pixmap is loaded from disk only when the widget becomes visible
 (via a QTimer single-shot deferred load triggered after show()).
+Fills whatever width the parent layout assigns; height is fixed at 16:9.
 """
 
 from pathlib import Path
 
-from PyQt6.QtWidgets import QLabel, QWidget
+from PyQt6.QtWidgets import QLabel, QWidget, QSizePolicy
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QPixmap
 
-_THUMB_W = 200
-_THUMB_H = 112   # 16:9
+_THUMB_H = 120   # fixed height; width comes from the layout
 
 
 class ThumbnailWidget(QLabel):
     """
     Displays a video thumbnail.  Pass `thumb_path=None` to show a placeholder.
+    Expands horizontally to fill its parent; height is fixed.
     """
 
     def __init__(self, thumb_path: str | None, parent: QWidget | None = None) -> None:
@@ -25,10 +26,11 @@ class ThumbnailWidget(QLabel):
         self._thumb_path = thumb_path
         self._loaded = False
 
-        self.setFixedSize(_THUMB_W, _THUMB_H)
+        self.setFixedHeight(_THUMB_H)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.setStyleSheet("background-color: #1a1a2e; border-radius: 4px;")
-        self.setText("⏳")  # placeholder until image loads
+        self.setStyleSheet("background-color: #15141b; border-radius: 0;")
+        self.setText("⏳")
 
     def showEvent(self, event) -> None:  # type: ignore[override]
         super().showEvent(event)
@@ -50,10 +52,11 @@ class ThumbnailWidget(QLabel):
         if pix.isNull():
             self.setText("🎬")
             return
+        w = self.width() or 200
         self.setPixmap(
             pix.scaled(
-                _THUMB_W, _THUMB_H,
-                Qt.AspectRatioMode.KeepAspectRatio,
+                w, _THUMB_H,
+                Qt.AspectRatioMode.KeepAspectRatioByExpanding,
                 Qt.TransformationMode.SmoothTransformation,
             )
         )

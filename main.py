@@ -10,6 +10,7 @@ import sys
 from PyQt6.QtWidgets import QApplication
 
 from teletag.ui.main_window import MainWindow
+from teletag.ui.theme import apply_theme
 
 
 def main() -> None:
@@ -18,6 +19,9 @@ def main() -> None:
     app.setApplicationName("TELE-TAG")
     app.setOrganizationName("TELE-TAG")
     app.setStyle("Fusion")
+    from PyQt6.QtCore import QSettings
+    saved_theme = QSettings().value("appearance/theme", "Aura")
+    apply_theme(app, saved_theme)
 
     window = MainWindow()
     window.show()

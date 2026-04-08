@@ -86,16 +86,6 @@ CREATE TABLE IF NOT EXISTS encode_jobs (
 );
 """
 
-_CREATE_WATCH_FOLDERS = """
-CREATE TABLE IF NOT EXISTS watch_folders (
-    id              INTEGER PRIMARY KEY AUTOINCREMENT,
-    library_id      INTEGER NOT NULL REFERENCES libraries(id) ON DELETE CASCADE,
-    path            TEXT    NOT NULL UNIQUE,
-    auto_tag_ids    TEXT    DEFAULT '[]',  -- JSON array of tag ids
-    enabled         INTEGER NOT NULL DEFAULT 1
-);
-"""
-
 # ---------------------------------------------------------------------------
 # Indexes
 # ---------------------------------------------------------------------------
@@ -143,7 +133,6 @@ def _create_tables(conn: sqlite3.Connection) -> None:
             _CREATE_TAG_CLOSURE,
             _CREATE_FILE_TAGS,
             _CREATE_ENCODE_JOBS,
-            _CREATE_WATCH_FOLDERS,
         ]:
             conn.execute(ddl)
         for idx_sql in _INDEXES:
