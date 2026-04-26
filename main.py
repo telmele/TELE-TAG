@@ -5,7 +5,13 @@ Run with:
     python main.py
 """
 
+import os
 import sys
+
+# Disable Qt FFmpeg hardware (Vulkan/D3D/VAAPI) decoding.
+# The default hw pipeline crashes on some GPUs with VK_ERROR_DEVICE_LOST;
+# software decoding is stable and fast enough for preview and playback.
+os.environ.setdefault("QT_FFMPEG_DECODING_HW_DEVICE_TYPES", "")
 
 from PyQt6.QtWidgets import QApplication
 
@@ -24,7 +30,7 @@ def main() -> None:
     apply_theme(app, saved_theme)
 
     window = MainWindow()
-    window.show()
+    window.showMaximized()
 
     sys.exit(app.exec())
 

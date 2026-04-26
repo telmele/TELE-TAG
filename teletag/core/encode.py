@@ -11,6 +11,7 @@ Job status is persisted to the `encode_jobs` table.
 import logging
 import re
 import subprocess
+import threading
 from pathlib import Path
 from typing import Callable
 
@@ -135,6 +136,7 @@ def run_encode_job(
     scale_mode: str,
     progress_cb: Callable[[float], None] | None = None,
     error_cb: Callable[[str], None] | None = None,
+    log_cb: Callable[[str], None] | None = None,
 ) -> bool:
     """
     Execute a single encode job synchronously.
@@ -178,6 +180,20 @@ def run_encode_job(
 
     out_time_re = re.compile(r"out_time_us=(\d+)")
 
+    # Drain stderr in a background thread to prevent pipe-buffer deadlock on Windows.
+    stderr_lines: list[str] = []
+
+    def _drain_stderr() -> None:
+        assert proc.stderr is not None
+        for line in proc.stderr:
+            line = line.rstrip("\n")
+            stderr_lines.append(line)
+            if log_cb:
+                log_cb(line)
+
+    stderr_thread = threading.Thread(target=_drain_stderr, daemon=True)
+    stderr_thread.start()
+
     assert proc.stdout is not None
     for line in proc.stdout:
         m = out_time_re.search(line)
@@ -186,11 +202,11 @@ def run_encode_job(
             progress_cb(pct)
 
     proc.wait()
+    stderr_thread.join()
 
     if proc.returncode != 0:
-        stderr = proc.stderr.read() if proc.stderr else ""
-        # DXV-specific hint.
-        if preset == "dxv" and "Unknown encoder" in stderr:  # noqa: S105
+        stderr = "".join(stderr_lines)
+        if preset == "dxv" and "Unknown encoder" in stderr:
             msg = (
                 "DXV encoding requires the Resolume DXV codec to be installed on this machine. "
                 "Please install Resolume Avenue or Arena, then retry."

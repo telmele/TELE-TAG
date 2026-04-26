@@ -1,25 +1,19 @@
 """
 Main application window.
 
-Layout:
-  ┌──────────────────────────────────────────────────────────┐
-  │  [Library ▾]   [Search bar]              [Inbox badge]  │
-  ├────────┬───────────────────────────┬──────────┬──────────┤
-  │  Tag   │       Video Grid          │  Detail  │  Inbox   │
-  │  Tree  │                           │  Panel   │  Panel   │
-  └────────┴───────────────────────────┴──────────┴──────────┘
-
-The Inbox panel is shown/hidden via the toolbar badge button.
+Two tabs:
+  Library  — Tag tree | Video Grid | File Detail
+  Convert  — Encode queue | Settings | Source info
 """
 
 import logging
 from pathlib import Path
 
 from PyQt6.QtWidgets import (
-    QMainWindow,
+    QMainWindow, QTabWidget,
     QToolBar, QComboBox, QLineEdit, QPushButton,
     QFileDialog, QSplitter, QMessageBox,
-    QInputDialog, QProgressDialog,
+    QInputDialog, QProgressDialog, QWidget, QVBoxLayout,
 )
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, QObject, QSettings
 from PyQt6.QtGui import QAction, QKeySequence
@@ -30,7 +24,7 @@ from teletag.core.watcher import FileWatcher, WatcherSignals
 from teletag.ui.tag_panel import TagPanel
 from teletag.ui.grid_panel import GridPanel
 from teletag.ui.detail_panel import DetailPanel
-from teletag.ui.encode_dialog import EncodeDialog
+from teletag.ui.convert_panel import ConvertPanel
 from teletag.ui.fullscreen_player import FullscreenPlayer
 
 logger = logging.getLogger(__name__)
@@ -41,7 +35,7 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 class _ScanSignals(QObject):
-    progress = pyqtSignal(int, int, str)   # (current, total, filename)
+    progress = pyqtSignal(int, int, str)
     finished = pyqtSignal()
 
 
@@ -87,39 +81,54 @@ class MainWindow(QMainWindow):
         self._build_menubar()
         self._build_toolbar()
 
-        # Panels
+        self._tabs = QTabWidget()
+        self._tabs.addTab(self._build_library_tab(), "Library")
+        self._tabs.addTab(self._build_convert_tab(), "Convert")
+
+        self.setCentralWidget(self._tabs)
+        self.statusBar().showMessage("Ready — add a library to get started.")
+
+    def _build_library_tab(self) -> QWidget:
         self._tag_panel = TagPanel()
         self._tag_panel.tag_selected.connect(self._on_tag_selected)
         self._tag_panel.tags_changed.connect(self._refresh_grid)
+        self._tag_panel.tags_changed.connect(lambda: self._grid_panel.refresh_filters())
 
         self._grid_panel = GridPanel()
         self._grid_panel.file_selected.connect(self._on_file_selected)
         self._grid_panel.selection_changed.connect(self._on_selection_changed)
         self._grid_panel.fullscreen_requested.connect(self._on_fullscreen_requested)
+        self._grid_panel.tags_changed.connect(self._tag_panel.refresh)
+        self._grid_panel.add_to_convert_queue.connect(self._on_add_to_convert_queue)
         self._fullscreen_player: FullscreenPlayer | None = None
 
         self._detail_panel = DetailPanel()
-        self._detail_panel.encode_requested.connect(self._on_encode_requested)
-        self._detail_panel.tags_changed.connect(self._refresh_grid)
-        self._tag_panel.tags_changed.connect(self._detail_panel._refresh_tag_combo)
+        self._grid_panel.tags_changed.connect(
+            lambda: self._detail_panel.refresh_tags_for(
+                [self._detail_panel._file_id] if self._detail_panel._file_id else []
+            )
+        )
 
-        # Splitter
         splitter = QSplitter(Qt.Orientation.Horizontal)
         splitter.addWidget(self._tag_panel)
         splitter.addWidget(self._grid_panel)
         splitter.addWidget(self._detail_panel)
-        splitter.setStretchFactor(1, 1)   # grid gets all extra space
+        splitter.setStretchFactor(1, 1)
         splitter.setSizes([200, 800, 260])
 
-        self.setCentralWidget(splitter)
+        tab = QWidget()
+        layout = QVBoxLayout(tab)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(splitter)
+        return tab
 
-        # Status bar
-        self.statusBar().showMessage("Ready — add a library to get started.")
+    def _build_convert_tab(self) -> QWidget:
+        self._convert_panel = ConvertPanel()
+        return self._convert_panel
 
     def _build_menubar(self) -> None:
         mb = self.menuBar()
 
-        # ── Library menu ──────────────────────────────────────────────
         lib_menu = mb.addMenu("Library")
 
         act_add = QAction("Add Library…", self)
@@ -147,7 +156,6 @@ class MainWindow(QMainWindow):
         self._act_remove.setEnabled(False)
         lib_menu.addAction(self._act_remove)
 
-        # ── Settings menu ─────────────────────────────────────────────
         settings_menu = mb.addMenu("Settings")
 
         act_prefs = QAction("Preferences…", self)
@@ -166,14 +174,12 @@ class MainWindow(QMainWindow):
         tb.setMovable(False)
         self.addToolBar(tb)
 
-        # Library switcher
         self._lib_combo = QComboBox()
         self._lib_combo.setMinimumWidth(180)
         self._lib_combo.setToolTip("Switch active library")
         self._lib_combo.currentIndexChanged.connect(self._on_library_switched)
         tb.addWidget(self._lib_combo)
 
-        # Add library button
         btn_add_lib = QPushButton("+ Library")
         btn_add_lib.setToolTip("Add a new library folder")
         btn_add_lib.clicked.connect(self._on_add_library)
@@ -181,7 +187,6 @@ class MainWindow(QMainWindow):
 
         tb.addSeparator()
 
-        # Search bar
         self._search_bar = QLineEdit()
         self._search_bar.setPlaceholderText("Search files…  (Ctrl+F)")
         self._search_bar.setMinimumWidth(240)
@@ -195,7 +200,6 @@ class MainWindow(QMainWindow):
 
         tb.addSeparator()
 
-        # Rescan
         btn_rescan = QPushButton("⟳ Rescan")
         btn_rescan.setToolTip("Rescan library for new/changed files")
         btn_rescan.clicked.connect(self._on_rescan)
@@ -217,7 +221,6 @@ class MainWindow(QMainWindow):
         )
         if not ok or not name.strip():
             return
-
         try:
             library = add_library(name.strip(), Path(folder))
         except Exception as exc:
@@ -225,7 +228,6 @@ class MainWindow(QMainWindow):
             return
 
         if any(lib.id == library.id for lib in self._libraries):
-            # Already in list — just switch to it.
             idx = next(i for i, lib in enumerate(self._libraries) if lib.id == library.id)
             self._lib_combo.setCurrentIndex(idx)
             return
@@ -233,14 +235,9 @@ class MainWindow(QMainWindow):
         self._libraries.append(library)
         self._lib_combo.addItem(library.name, library.id)
         self._lib_combo.setCurrentIndex(self._lib_combo.count() - 1)
-
         self._watcher.watch_library(library)
         self._save_library_paths()
         self._start_scan(library)
-
-    # ------------------------------------------------------------------
-    # Persist / restore known libraries
-    # ------------------------------------------------------------------
 
     def _save_library_paths(self) -> None:
         settings = QSettings()
@@ -250,10 +247,8 @@ class MainWindow(QMainWindow):
     def _restore_libraries(self) -> None:
         settings = QSettings()
         raw = settings.value("libraries", [])
-        # QSettings may return a plain string when there is only one entry.
         if isinstance(raw, str):
             raw = [raw]
-
         for entry in raw:
             try:
                 name, path_str = entry.split("|", 1)
@@ -283,6 +278,7 @@ class MainWindow(QMainWindow):
         self._tag_panel.set_library(library)
         self._grid_panel.set_library(library)
         self._detail_panel.set_library(library)
+        self._convert_panel.set_library(library)
         self._update_library_actions()
         self.statusBar().showMessage(f"Library: {library.name}  ({library.root_path})")
 
@@ -327,7 +323,6 @@ class MainWindow(QMainWindow):
             return
         idx = self._lib_combo.currentIndex()
         self._libraries.pop(idx)
-        # removeItem triggers currentIndexChanged → _on_library_switched handles the rest.
         self._lib_combo.removeItem(idx)
         self._save_library_paths()
         if not self._libraries:
@@ -380,7 +375,7 @@ class MainWindow(QMainWindow):
         worker.start()
 
     # ------------------------------------------------------------------
-    # Tag / search events
+    # Events
     # ------------------------------------------------------------------
 
     def _on_tag_selected(self, tag_id: int) -> None:
@@ -388,10 +383,6 @@ class MainWindow(QMainWindow):
 
     def _on_search_changed(self, text: str) -> None:
         self._grid_panel.set_search(text)
-
-    # ------------------------------------------------------------------
-    # File events
-    # ------------------------------------------------------------------
 
     def _on_file_selected(self, file_id: int) -> None:
         self._detail_panel.show_file(file_id)
@@ -415,11 +406,11 @@ class MainWindow(QMainWindow):
         self._fullscreen_player = FullscreenPlayer(abs_path)
         self._fullscreen_player.showFullScreen()
 
-    def _on_encode_requested(self, file_id: int) -> None:
+    def _on_add_to_convert_queue(self, file_ids: list[int]) -> None:
         if self._current_library is None:
             return
-        dlg = EncodeDialog(self._current_library, file_id, self)
-        dlg.exec()
+        self._convert_panel.add_files(file_ids, self._current_library)
+        self._tabs.setCurrentIndex(1)
 
     def _on_file_added(self, library_id: int, _abs_path: str) -> None:
         if self._current_library and self._current_library.id == library_id:
