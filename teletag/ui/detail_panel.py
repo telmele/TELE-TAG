@@ -142,7 +142,6 @@ class DetailPanel(QWidget):
         self._multi_ids: list[int] = []
         self._setup_ui()
         self.setMinimumWidth(220)
-        self.setMaximumWidth(320)
 
     def _setup_ui(self) -> None:
         layout = QVBoxLayout(self)

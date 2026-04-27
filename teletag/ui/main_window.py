@@ -1,19 +1,19 @@
 """
 Main application window.
 
-Two tabs:
-  Library  — Tag tree | Video Grid | File Detail
-  Convert  — Encode queue | Settings | Source info
+Panels (Tags, Details, Convert) are QDockWidgets — dockable, tabbable,
+floatable. GridPanel is the central widget. WorkspaceManager handles
+layout persistence and the Window menu.
 """
 
 import logging
 from pathlib import Path
 
 from PyQt6.QtWidgets import (
-    QMainWindow, QTabWidget,
+    QMainWindow, QDockWidget,
     QToolBar, QComboBox, QLineEdit, QPushButton,
-    QFileDialog, QSplitter, QMessageBox,
-    QInputDialog, QProgressDialog, QWidget, QVBoxLayout,
+    QFileDialog, QMessageBox,
+    QInputDialog, QProgressDialog,
 )
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, QObject, QSettings
 from PyQt6.QtGui import QAction, QKeySequence
@@ -26,6 +26,7 @@ from teletag.ui.grid_panel import GridPanel
 from teletag.ui.detail_panel import DetailPanel
 from teletag.ui.convert_panel import ConvertPanel
 from teletag.ui.fullscreen_player import FullscreenPlayer
+from teletag.ui.workspace import WorkspaceManager
 
 logger = logging.getLogger(__name__)
 
@@ -63,6 +64,7 @@ class MainWindow(QMainWindow):
         self._libraries: list[Library] = []
         self._current_library: Library | None = None
         self._scan_worker: _ScanWorker | None = None
+        self._fullscreen_player: FullscreenPlayer | None = None
 
         self._watcher_signals = WatcherSignals()
         self._watcher = FileWatcher(self._watcher_signals)
@@ -78,17 +80,26 @@ class MainWindow(QMainWindow):
     # ------------------------------------------------------------------
 
     def _setup_ui(self) -> None:
+        self.setDockOptions(
+            QMainWindow.DockOption.AllowTabbedDocks
+            | QMainWindow.DockOption.AllowNestedDocks
+            | QMainWindow.DockOption.AnimatedDocks
+            | QMainWindow.DockOption.GroupedDragging
+        )
+        self._build_panels()
+        self._build_docks()
+        self._workspace = WorkspaceManager(self)
+        self._workspace.register_dock("dock_tags", self._dock_tags)
+        self._workspace.register_dock("dock_detail", self._dock_detail)
+        self._workspace.register_dock("dock_convert", self._dock_convert)
         self._build_menubar()
         self._build_toolbar()
-
-        self._tabs = QTabWidget()
-        self._tabs.addTab(self._build_library_tab(), "Library")
-        self._tabs.addTab(self._build_convert_tab(), "Convert")
-
-        self.setCentralWidget(self._tabs)
+        restored = self._workspace.restore()
+        if not restored:
+            self._workspace.apply_preset("Default")
         self.statusBar().showMessage("Ready — add a library to get started.")
 
-    def _build_library_tab(self) -> QWidget:
+    def _build_panels(self) -> None:
         self._tag_panel = TagPanel()
         self._tag_panel.tag_selected.connect(self._on_tag_selected)
         self._tag_panel.tags_changed.connect(self._refresh_grid)
@@ -100,7 +111,6 @@ class MainWindow(QMainWindow):
         self._grid_panel.fullscreen_requested.connect(self._on_fullscreen_requested)
         self._grid_panel.tags_changed.connect(self._tag_panel.refresh)
         self._grid_panel.add_to_convert_queue.connect(self._on_add_to_convert_queue)
-        self._fullscreen_player: FullscreenPlayer | None = None
 
         self._detail_panel = DetailPanel()
         self._grid_panel.tags_changed.connect(
@@ -109,22 +119,38 @@ class MainWindow(QMainWindow):
             )
         )
 
-        splitter = QSplitter(Qt.Orientation.Horizontal)
-        splitter.addWidget(self._tag_panel)
-        splitter.addWidget(self._grid_panel)
-        splitter.addWidget(self._detail_panel)
-        splitter.setStretchFactor(1, 1)
-        splitter.setSizes([200, 800, 260])
-
-        tab = QWidget()
-        layout = QVBoxLayout(tab)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.addWidget(splitter)
-        return tab
-
-    def _build_convert_tab(self) -> QWidget:
         self._convert_panel = ConvertPanel()
-        return self._convert_panel
+
+        self.setCentralWidget(self._grid_panel)
+
+    def _build_docks(self) -> None:
+        features = (
+            QDockWidget.DockWidgetFeature.DockWidgetClosable
+            | QDockWidget.DockWidgetFeature.DockWidgetMovable
+            | QDockWidget.DockWidgetFeature.DockWidgetFloatable
+        )
+
+        self._dock_tags = QDockWidget("Tags", self)
+        self._dock_tags.setObjectName("dock_tags")
+        self._dock_tags.setWidget(self._tag_panel)
+        self._dock_tags.setAllowedAreas(Qt.DockWidgetArea.AllDockWidgetAreas)
+        self._dock_tags.setFeatures(features)
+        self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, self._dock_tags)
+
+        self._dock_detail = QDockWidget("Details", self)
+        self._dock_detail.setObjectName("dock_detail")
+        self._dock_detail.setWidget(self._detail_panel)
+        self._dock_detail.setAllowedAreas(Qt.DockWidgetArea.AllDockWidgetAreas)
+        self._dock_detail.setFeatures(features)
+        self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self._dock_detail)
+
+        self._dock_convert = QDockWidget("Convert", self)
+        self._dock_convert.setObjectName("dock_convert")
+        self._dock_convert.setWidget(self._convert_panel)
+        self._dock_convert.setAllowedAreas(Qt.DockWidgetArea.AllDockWidgetAreas)
+        self._dock_convert.setFeatures(features)
+        self.addDockWidget(Qt.DockWidgetArea.BottomDockWidgetArea, self._dock_convert)
+        self._dock_convert.hide()
 
     def _build_menubar(self) -> None:
         mb = self.menuBar()
@@ -151,10 +177,18 @@ class MainWindow(QMainWindow):
 
         lib_menu.addSeparator()
 
+        self._libs_submenu = lib_menu.addMenu("Open Library")
+        self._libs_submenu.aboutToShow.connect(self._populate_libs_submenu)
+
+        lib_menu.addSeparator()
+
         self._act_remove = QAction("Remove Library", self)
         self._act_remove.triggered.connect(self._on_remove_library)
         self._act_remove.setEnabled(False)
         lib_menu.addAction(self._act_remove)
+
+        # Window menu inserted between Library and Settings
+        self._workspace.build_window_menu(mb)
 
         settings_menu = mb.addMenu("Settings")
 
@@ -227,8 +261,8 @@ class MainWindow(QMainWindow):
             QMessageBox.critical(self, "Error", str(exc))
             return
 
-        if any(lib.id == library.id for lib in self._libraries):
-            idx = next(i for i, lib in enumerate(self._libraries) if lib.id == library.id)
+        if any(lib.root_path == library.root_path for lib in self._libraries):
+            idx = next(i for i, lib in enumerate(self._libraries) if lib.root_path == library.root_path)
             self._lib_combo.setCurrentIndex(idx)
             return
 
@@ -257,7 +291,7 @@ class MainWindow(QMainWindow):
                     logger.warning("Skipping missing library path: %s", root_path)
                     continue
                 library = add_library(name, root_path)
-                if any(lib.id == library.id for lib in self._libraries):
+                if any(lib.root_path == library.root_path for lib in self._libraries):
                     continue
                 self._libraries.append(library)
                 self._lib_combo.addItem(library.name, library.id)
@@ -287,6 +321,21 @@ class MainWindow(QMainWindow):
         self._act_rename.setEnabled(has_lib)
         self._act_rescan_menu.setEnabled(has_lib)
         self._act_remove.setEnabled(has_lib)
+
+    def _populate_libs_submenu(self) -> None:
+        self._libs_submenu.clear()
+        if not self._libraries:
+            no_act = self._libs_submenu.addAction("(no libraries loaded)")
+            no_act.setEnabled(False)
+            return
+        for i, lib in enumerate(self._libraries):
+            act = self._libs_submenu.addAction(f"{lib.name}  —  {lib.root_path}")
+            act.setCheckable(True)
+            act.setChecked(
+                self._current_library is not None
+                and lib.root_path == self._current_library.root_path
+            )
+            act.triggered.connect(lambda _checked=False, idx=i: self._lib_combo.setCurrentIndex(idx))
 
     def _on_rename_library(self) -> None:
         if self._current_library is None:
@@ -410,7 +459,8 @@ class MainWindow(QMainWindow):
         if self._current_library is None:
             return
         self._convert_panel.add_files(file_ids, self._current_library)
-        self._tabs.setCurrentIndex(1)
+        self._dock_convert.show()
+        self._dock_convert.raise_()
 
     def _on_file_added(self, library_id: int, _abs_path: str) -> None:
         if self._current_library and self._current_library.id == library_id:
@@ -436,6 +486,7 @@ class MainWindow(QMainWindow):
     # ------------------------------------------------------------------
 
     def closeEvent(self, event) -> None:  # type: ignore[override]
+        self._workspace.save()
         self._watcher.stop()
         from teletag.db.connection import close_all
         close_all()

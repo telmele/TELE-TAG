@@ -21,6 +21,7 @@ class Tag:
     library_id: int
     name: str
     parent_id: int | None
+    tag_type: str = "tag"   # 'tag' | 'category' | 'meta'
     file_count: int = 0
     children: list["Tag"] = field(default_factory=list)
 
@@ -29,13 +30,19 @@ class Tag:
 # Write operations
 # ---------------------------------------------------------------------------
 
-def create_tag(db_path: Path, library_id: int, name: str, parent_id: int | None = None) -> Tag:
+def create_tag(
+    db_path: Path,
+    library_id: int,
+    name: str,
+    parent_id: int | None = None,
+    tag_type: str = "tag",
+) -> Tag:
     """Insert a tag and populate the closure table."""
     conn = get_connection(db_path)
     with conn:
         cur = conn.execute(
-            "INSERT INTO tags (library_id, name, parent_id) VALUES (?, ?, ?)",
-            (library_id, name, parent_id),
+            "INSERT INTO tags (library_id, name, parent_id, tag_type) VALUES (?, ?, ?, ?)",
+            (library_id, name, parent_id, tag_type),
         )
         tag_id = cur.lastrowid
 
@@ -57,7 +64,7 @@ def create_tag(db_path: Path, library_id: int, name: str, parent_id: int | None 
                 (tag_id, parent_id),
             )
 
-    return Tag(id=tag_id, library_id=library_id, name=name, parent_id=parent_id)
+    return Tag(id=tag_id, library_id=library_id, name=name, parent_id=parent_id, tag_type=tag_type)
 
 
 def delete_tag(db_path: Path, tag_id: int) -> None:
@@ -110,7 +117,7 @@ def get_tags_for_library(db_path: Path, library_id: int) -> list[Tag]:
     conn = get_connection(db_path)
     rows = conn.execute(
         """
-        SELECT t.id, t.library_id, t.name, t.parent_id,
+        SELECT t.id, t.library_id, t.name, t.parent_id, t.tag_type,
                COUNT(DISTINCT ft.file_id) AS file_count
         FROM tags t
         LEFT JOIN tag_closure tc ON tc.ancestor_id = t.id
@@ -126,6 +133,7 @@ def get_tags_for_library(db_path: Path, library_id: int) -> list[Tag]:
             library_id=r["library_id"],
             name=r["name"],
             parent_id=r["parent_id"],
+            tag_type=r["tag_type"],
             file_count=r["file_count"],
         )
         for r in rows
@@ -150,14 +158,18 @@ def get_tags_for_file(db_path: Path, file_id: int) -> list[Tag]:
     conn = get_connection(db_path)
     rows = conn.execute(
         """
-        SELECT t.id, t.library_id, t.name, t.parent_id
+        SELECT t.id, t.library_id, t.name, t.parent_id, t.tag_type
         FROM tags t
         JOIN file_tags ft ON ft.tag_id = t.id
         WHERE ft.file_id = ?
         """,
         (file_id,),
     ).fetchall()
-    return [Tag(id=r["id"], library_id=r["library_id"], name=r["name"], parent_id=r["parent_id"]) for r in rows]
+    return [
+        Tag(id=r["id"], library_id=r["library_id"], name=r["name"],
+            parent_id=r["parent_id"], tag_type=r["tag_type"])
+        for r in rows
+    ]
 
 
 def get_descendant_ids(db_path: Path, tag_id: int) -> list[int]:

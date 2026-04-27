@@ -244,6 +244,46 @@ QSplitter::handle:horizontal { width: 1px;  }
 QSplitter::handle:vertical   { height: 1px; }
 QSplitter::handle:hover      { background: $ACCENT; }
 
+/* Dock widgets */
+QDockWidget {
+    background: $BG1;
+    border: 1px solid $BG3;
+}
+QDockWidget::title {
+    background: $BG2;
+    padding: 4px 8px;
+    font-size: 11px;
+    font-weight: 600;
+    color: $MUTED;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-bottom: 1px solid $BG3;
+}
+QDockWidget::close-button, QDockWidget::float-button {
+    background: transparent;
+    border: none;
+    padding: 2px;
+}
+QDockWidget::close-button:hover, QDockWidget::float-button:hover {
+    background: $BG3;
+}
+
+/* Tab bar (tabbed docks) */
+QTabBar { background: $BG1; border-bottom: 1px solid $BG3; }
+QTabBar::tab {
+    background: $BG2;
+    color: $MUTED;
+    padding: 5px 14px;
+    border: none;
+    border-bottom: 2px solid transparent;
+}
+QTabBar::tab:selected {
+    color: $ACCENT;
+    background: $BG3;
+    border-bottom: 2px solid $ACCENT;
+}
+QTabBar::tab:hover:!selected { background: $BG3; color: $TEXT; }
+
 /* GroupBox */
 QGroupBox {
     border: 1px solid $BG3;

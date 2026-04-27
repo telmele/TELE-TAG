@@ -15,7 +15,7 @@ from teletag.db.connection import get_connection
 logger = logging.getLogger(__name__)
 
 # Bump this integer whenever a new migration is added.
-CURRENT_VERSION = 1
+CURRENT_VERSION = 2
 
 # ---------------------------------------------------------------------------
 # DDL
@@ -107,6 +107,8 @@ _MIGRATIONS: list[tuple[int, str]] = [
     # Version 1 — initial schema (all tables + indexes created above via
     # CREATE TABLE IF NOT EXISTS, so migrations here are for ALTER TABLE etc.)
     (1, "SELECT 1;"),  # no-op placeholder; initial tables created unconditionally
+    # Version 2 — add tag_type column ('tag' | 'category' | 'meta')
+    (2, "ALTER TABLE tags ADD COLUMN tag_type TEXT NOT NULL DEFAULT 'tag';"),
 ]
 
 
