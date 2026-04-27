@@ -1,24 +1,47 @@
 # TELE-TAG
 
-A Python desktop application for managing a local or Nextcloud-hosted video library with hierarchical tagging, re-encoding presets, and a staging inbox for incoming files.
+**A local video library manager built for VJs.**
+
+Organize, tag, and re-encode your video assets — HAP, H.264, ProRes, WebM — without leaving your desktop. No cloud, no subscription, no telemetry. Everything lives in a single SQLite file next to your footage.
+
+---
 
 ## Features
 
-- **Library management** — add any folder as a library; all metadata lives in a single `.teletag/metadata.db` SQLite file
-- **File identity** — files tracked by relative path + xxHash so renames and moves are reconcilable on rescan
-- **Hierarchical tags** — closure-table-backed tag tree with per-library scoping; searching a parent returns all descendant-tagged files
-- **Video grid** — lazy-loading thumbnail grid with tag pills, drag-out to OS / Resolume
-- **Re-encode panel** — HAP, DXV (requires Resolume codec), H.264, ProRes, WebM; fit / fill / stretch / resize scale modes
-- **Watch folders / Staging inbox** — real-time `watchdog` monitoring; incoming files land in an inbox with a "needs tagging" badge before being promoted to the main library
-- **Concurrent-safe DB** — SQLite WAL mode on every connection for freeze-free UI
+- **Hierarchical tags** — organize tags in a parent → child tree; filtering a parent returns all descendant files
+- **Thumbnail grid & list view** — browse your library with tag pills, drag files out to the OS or Resolume
+- **Folder mode** — nested folder tree inside both grid and list views
+- **Re-encode** — HAP, DXV\*, H.264, ProRes, WebM with fit / fill / stretch / resize scale modes
+- **Fullscreen player** — click any thumbnail to play inline
+- **Watch folders** — new files appear automatically via real-time monitoring
+- **Dockable panels & themes** — flexible layout, four built-in color themes
 
-## Requirements
+> \* DXV encoding requires the Resolume DXV codec installed separately.
 
-- Python 3.11+
-- `ffmpeg` on `PATH` (for thumbnail extraction, metadata probing, and transcoding)
-- For DXV encoding: Resolume Avenue/Arena with the DXV codec installed on the machine
+---
 
-## Installation
+## Download
+
+Pre-built binaries (FFmpeg included) are attached to every [GitHub Release](../../releases/latest).
+
+| Platform | File |
+|---|---|
+| Windows 10/11 (64-bit) | `TELE-TAG-windows.zip` |
+| macOS 10.15+ (Intel + Rosetta 2) | `TELE-TAG-macos.zip` |
+| Linux (Ubuntu 22.04+) | `TELE-TAG-linux.tar.gz` |
+
+**Windows** — extract the zip, run `TELE-TAG.exe`.
+
+**macOS** — extract the zip, right-click `TELE-TAG.app` → Open (needed once to bypass Gatekeeper on unsigned builds).
+
+**Linux** — extract the archive, run `./TELE-TAG/TELE-TAG`. You may need `libgl1` and `libxcb-cursor0`:
+```bash
+sudo apt-get install libgl1 libxcb-cursor0
+```
+
+---
+
+## Run from Source
 
 ```bash
 # 1. Clone
@@ -27,6 +50,7 @@ cd tele-tag
 
 # 2. Create virtual environment
 python -m venv .venv
+
 # Windows (PowerShell)
 .venv\Scripts\Activate.ps1
 # macOS / Linux
@@ -35,50 +59,36 @@ source .venv/bin/activate
 # 3. Install dependencies
 pip install -r requirements.txt
 
-# 4. Run
+# 4. Install FFmpeg (required — not bundled when running from source)
+# macOS:   brew install ffmpeg
+# Ubuntu:  sudo apt install ffmpeg
+# Windows: winget install ffmpeg  (or download from https://ffmpeg.org)
+
+# 5. Run
 python main.py
 ```
 
-## Nextcloud sync notes
+Requirements: **Python 3.11+** and **FFmpeg** on your PATH.
 
-If your library root lives inside a Nextcloud-synced folder, add the following to your Nextcloud client's **ignored files** list (or `.sync-exclude.lst`) to prevent the database WAL files from interfering with sync:
+---
+
+## Nextcloud / Synced Folders
+
+Add these to your sync client's ignored files list to prevent partial-sync issues with the WAL write-ahead log:
 
 ```
-.teletag/metadata.db
 .teletag/metadata.db-wal
 .teletag/metadata.db-shm
 .teletag/thumbs/
 ```
 
-The `.teletag/` folder itself does **not** need to be excluded — only the files above. This keeps the DB from being partially synced mid-write.
+---
 
-## Project structure
+## Credits
 
-```
-tele-tag/
-├── main.py                  # Entry point
-├── requirements.txt
-├── teletag/
-│   ├── db/
-│   │   ├── connection.py    # WAL-enabled connection manager
-│   │   └── schema.py        # Schema definitions & migrations
-│   ├── core/
-│   │   ├── library.py       # Library CRUD
-│   │   ├── ingest.py        # Scan → hash → ffprobe → thumbnail
-│   │   ├── tags.py          # Tag & closure-table management
-│   │   ├── encode.py        # Re-encode job runner
-│   │   └── watcher.py       # Watchdog file watcher
-│   └── ui/
-│       ├── main_window.py   # Top-level QMainWindow
-│       ├── tag_panel.py     # Left: tag tree with counts
-│       ├── grid_panel.py    # Center: thumbnail grid
-│       ├── detail_panel.py  # Right: file detail & re-encode
-│       ├── inbox_panel.py   # Staging area / watch-folder inbox
-│       ├── encode_dialog.py # Re-encode settings dialog
-│       └── widgets/
-│           ├── thumbnail.py # Lazy-loading thumbnail widget
-│           └── tag_pill.py  # Tag pill widget
-```
+TELE-TAG was built by telmele with the help of [Claude](https://claude.ai) (Anthropic) as an AI pair programmer — used throughout for architecture decisions, feature implementation, and debugging.
+
+---
 
 ## License
 

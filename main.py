@@ -8,6 +8,11 @@ Run with:
 import os
 import sys
 
+# When running from a PyInstaller bundle, expose the bundled ffmpeg/ffprobe
+# to subprocess calls before anything else runs.
+if getattr(sys, "frozen", False):
+    os.environ["PATH"] = sys._MEIPASS + os.pathsep + os.environ.get("PATH", "")
+
 # Disable Qt FFmpeg hardware (Vulkan/D3D/VAAPI) decoding.
 # The default hw pipeline crashes on some GPUs with VK_ERROR_DEVICE_LOST;
 # software decoding is stable and fast enough for preview and playback.

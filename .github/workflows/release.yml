@@ -1,0 +1,103 @@
+name: Build & Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            artifact: TELE-TAG-windows.zip
+            ffmpeg_url: https://github.com/yt-dlp/FFmpeg-Builds/releases/latest/download/ffmpeg-master-latest-win64-gpl.zip
+
+          # macos-13 = x86_64 — runs on both Intel and Apple Silicon (via Rosetta 2)
+          - os: macos-13
+            artifact: TELE-TAG-macos.zip
+            ffmpeg_url: https://github.com/yt-dlp/FFmpeg-Builds/releases/latest/download/ffmpeg-master-latest-macos64-gpl.zip
+
+          - os: ubuntu-22.04
+            artifact: TELE-TAG-linux.tar.gz
+            ffmpeg_url: https://github.com/yt-dlp/FFmpeg-Builds/releases/latest/download/ffmpeg-master-latest-linux64-gpl.tar.xz
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # ── System deps ────────────────────────────────────────────────────────
+
+      - name: Install system deps (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y libgl1 libxcb-cursor0 libxkbcommon-x11-0 libdbus-1-3
+
+      # ── FFmpeg static binaries ─────────────────────────────────────────────
+
+      - name: Download FFmpeg (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Invoke-WebRequest -Uri "${{ matrix.ffmpeg_url }}" -OutFile ffmpeg.zip
+          Expand-Archive ffmpeg.zip -DestinationPath ffmpeg_tmp
+          New-Item -ItemType Directory -Force -Path ffmpeg_bin | Out-Null
+          Get-ChildItem -Recurse ffmpeg_tmp -Include ffmpeg.exe, ffprobe.exe |
+            ForEach-Object { Copy-Item $_.FullName ffmpeg_bin\ }
+
+      - name: Download FFmpeg (macOS / Linux)
+        if: runner.os != 'Windows'
+        run: |
+          mkdir -p ffmpeg_tmp ffmpeg_bin
+          curl -fsSL "${{ matrix.ffmpeg_url }}" -o ffmpeg_archive
+          if [[ "${{ matrix.ffmpeg_url }}" == *.tar.xz ]]; then
+            tar xf ffmpeg_archive -C ffmpeg_tmp
+          else
+            unzip -q ffmpeg_archive -d ffmpeg_tmp
+          fi
+          find ffmpeg_tmp -type f \( -name "ffmpeg" -o -name "ffprobe" \) \
+            -exec cp {} ffmpeg_bin/ \;
+          chmod +x ffmpeg_bin/ffmpeg ffmpeg_bin/ffprobe
+
+      # ── Python deps & build ────────────────────────────────────────────────
+
+      - name: Install Python deps
+        run: pip install -r requirements.txt pyinstaller
+
+      - name: Build with PyInstaller
+        run: pyinstaller tele-tag.spec --noconfirm
+
+      # ── Package ───────────────────────────────────────────────────────────
+
+      - name: Package (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: Compress-Archive -Path dist\TELE-TAG -DestinationPath dist\TELE-TAG-windows.zip
+
+      - name: Package (macOS)
+        if: runner.os == 'macOS'
+        run: cd dist && zip -r TELE-TAG-macos.zip TELE-TAG.app
+
+      - name: Package (Linux)
+        if: runner.os == 'Linux'
+        run: tar czf dist/TELE-TAG-linux.tar.gz -C dist TELE-TAG
+
+      # ── Release ───────────────────────────────────────────────────────────
+
+      - name: Upload to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/${{ matrix.artifact }}
+          generate_release_notes: true
+          fail_on_unmatched_files: true
