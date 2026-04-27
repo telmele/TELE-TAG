@@ -7,7 +7,7 @@ Right-click opens context menu on either view.
 """
 
 from pathlib import Path
-from itertools import groupby
+from collections import defaultdict
 
 from PyQt6.QtWidgets import (
     QWidget, QScrollArea, QGridLayout, QVBoxLayout, QHBoxLayout,
@@ -217,6 +217,54 @@ class _GridContainer(QWidget):
             if rect.width() > 5 or rect.height() > 5:
                 self.rubber_selected.emit(rect, event.modifiers())
         super().mouseReleaseEvent(event)
+
+
+def _build_nested_folder_rows(files: list[tuple]) -> list[tuple]:
+    """Return a flat traversal of the folder tree as rows:
+      ("folder", depth, display_name)
+      ("file",   depth, file_dict, tags)
+    Top-level folders are depth 0; each nesting level adds 1.
+    A "(root)" header appears only when there are files directly in the library root.
+    """
+    folder_files: dict[str, list] = defaultdict(list)
+    for file_dict, tags in files:
+        parts = Path(file_dict["relative_path"]).parent.parts
+        folder = "/".join(parts)  # "" for library root
+        folder_files[folder].append((file_dict, tags))
+
+    # Collect all folders plus their ancestors
+    all_folders: set[str] = set(folder_files.keys())
+    for f in list(all_folders):
+        p = Path(f)
+        while p.parts:
+            p = p.parent
+            all_folders.add("/".join(p.parts))
+
+    # Build parent → sorted children map
+    children: dict[str, list[str]] = defaultdict(list)
+    for f in all_folders:
+        if not f:
+            continue
+        parent = "/".join(Path(f).parent.parts)
+        children[parent].append(f)
+    for lst in children.values():
+        lst.sort()
+
+    rows: list[tuple] = []
+
+    def _traverse(folder: str, depth: int) -> None:
+        name = Path(folder).name if folder else "(root)"
+        # Show "(root)" header only when the library root itself contains files
+        if folder or folder_files.get(""):
+            rows.append(("folder", depth, name))
+        for fd, tags in folder_files.get(folder, []):
+            rows.append(("file", depth, fd, tags))
+        for child in children.get(folder, []):
+            # Children of the virtual root keep depth 0 (siblings of "(root)")
+            _traverse(child, depth + 1 if folder else depth)
+
+    _traverse("", 0)
+    return rows
 
 
 class GridPanel(QWidget):
@@ -493,10 +541,6 @@ class GridPanel(QWidget):
         cols = max(1, self._scroll.viewport().width() // (_CARD_W + _CARD_SPACING))
         self._last_cols = cols
 
-        def _folder_key(entry: tuple) -> str:
-            p = str(Path(entry[0]["relative_path"]).parent)
-            return "(root)" if p == "." else p
-
         def _add_card(file_row: dict, tags: list, grow: int, gcol: int) -> None:
             card = VideoCard(file_row, tags)
             fid = file_row["id"]
@@ -509,29 +553,31 @@ class GridPanel(QWidget):
 
         if self._group_by_folder:
             grow, gcol = 0, 0
-            for folder, group_iter in groupby(files, key=_folder_key):
-                group_list = list(group_iter)
-                if gcol > 0:
+            for entry in _build_nested_folder_rows(files):
+                if entry[0] == "folder":
+                    _, depth, name = entry
+                    if gcol > 0:
+                        grow += 1
+                        gcol = 0
+                    indent = 6 + depth * 16
+                    hdr = QLabel(f"📁  {name}")
+                    hdr.setFixedHeight(28)
+                    hdr.setStyleSheet(
+                        f"background: #21202e; color: #6d6d7a; font-size: 11px;"
+                        f" font-weight: 600; letter-spacing: 0.4px;"
+                        f" border-bottom: 1px solid #292736; padding-left: {indent}px;"
+                    )
+                    self._grid.addWidget(hdr, grow, 0, 1, cols)
                     grow += 1
-                    gcol = 0
-                hdr = QLabel(f"  📁  {folder}")
-                hdr.setFixedHeight(28)
-                hdr.setStyleSheet(
-                    "background: #21202e; color: #6d6d7a; font-size: 11px;"
-                    " font-weight: 600; letter-spacing: 0.4px;"
-                    " border-bottom: 1px solid #292736; padding-left: 4px;"
-                )
-                self._grid.addWidget(hdr, grow, 0, 1, cols)
-                grow += 1
-                for file_row, tags in group_list:
+                else:
+                    _, depth, file_row, tags = entry
                     _add_card(file_row, tags, grow, gcol)
                     gcol += 1
                     if gcol >= cols:
                         gcol = 0
                         grow += 1
-                if gcol > 0:
-                    grow += 1
-                    gcol = 0
+            if gcol > 0:
+                grow += 1
         else:
             for i, (file_row, tags) in enumerate(files):
                 _add_card(file_row, tags, i // cols, i % cols)
@@ -621,16 +667,15 @@ class GridPanel(QWidget):
         files = self._query_files()
         self._card_order = [fd["id"] for fd, _ in files]
 
-        def _folder_key(entry: tuple) -> str:
-            p = str(Path(entry[0]["relative_path"]).parent)
-            return "(root)" if p == "." else p
-
         # Build flat row list — optionally inserting folder header rows
         row_data: list[tuple] = []
         if self._group_by_folder:
-            for folder, group_iter in groupby(files, key=_folder_key):
-                row_data.append(("folder", folder))
-                row_data.extend(("file", fd, tgs) for fd, tgs in group_iter)
+            for entry in _build_nested_folder_rows(files):
+                if entry[0] == "folder":
+                    row_data.append(entry)  # ("folder", depth, name)
+                else:
+                    _, depth, fd, tgs = entry
+                    row_data.append(("file", fd, tgs))
         else:
             row_data.extend(("file", fd, tgs) for fd, tgs in files)
 
@@ -646,9 +691,10 @@ class GridPanel(QWidget):
 
         for row_idx, entry in enumerate(row_data):
             if entry[0] == "folder":
-                folder_name = entry[1]
+                _, depth, folder_name = entry
+                indent = "    " * depth
                 for col in range(len(_TABLE_COLS)):
-                    cell = QTableWidgetItem(f"  📁  {folder_name}" if col == 0 else "")
+                    cell = QTableWidgetItem(f"{indent}📁  {folder_name}" if col == 0 else "")
                     cell.setFlags(_no_flags)
                     cell.setBackground(_folder_bg)
                     cell.setForeground(_folder_fg)
