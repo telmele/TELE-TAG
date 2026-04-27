@@ -21,21 +21,7 @@ from PyQt6.QtCore import Qt, pyqtSignal, QRect, QPoint, QSize
 
 from teletag.core.tags import Tag, get_tags_for_library, build_tag_tree, create_tag, delete_tag
 from teletag.core.library import Library
-
-_PILL_COLORS = [
-    ("#2a1f42", "#a277ff"),
-    ("#152e28", "#61ffca"),
-    ("#2e2010", "#ffca85"),
-    ("#2e1530", "#f694ff"),
-    ("#2e1515", "#ff6767"),
-    ("#152033", "#82e2ff"),
-    ("#1a2e10", "#c3e88d"),
-    ("#2e2a10", "#ffe073"),
-]
-
-
-def _pill_colors(name: str) -> tuple[str, str]:
-    return _PILL_COLORS[hash(name) % len(_PILL_COLORS)]
+from teletag.ui.theme import get_palette, pill_colors as _pill_colors
 
 
 # ---------------------------------------------------------------------------
@@ -149,12 +135,13 @@ class _TagChip(QWidget):
         self._apply_style(hover=False)
 
     def _apply_style(self, hover: bool) -> None:
+        p = get_palette()
         if self._selected:
             self.setStyleSheet(
                 f"QWidget {{ background: {self._fg}; border-left: 2px solid {self._fg}; }}"
             )
             self._lbl.setStyleSheet(
-                "background: transparent; border: none; color: #0d0d14;"
+                f"background: transparent; border: none; color: {p['SEL_FG']};"
                 " font-size: 10px; font-weight: 700; padding: 0 2px 0 0;"
             )
         else:
@@ -165,7 +152,7 @@ class _TagChip(QWidget):
                 f"background: transparent; border: none; color: {self._fg};"
                 " font-size: 10px; font-weight: 700; padding: 0 2px 0 0;"
             )
-        del_color = "#ff6767" if hover else "#3a3a4a"
+        del_color = p["DANGER"] if hover else p["BG3"]
         self._del.setStyleSheet(
             f"background: transparent; border: none; color: {del_color};"
             " font-size: 11px; font-weight: 700; padding: 0;"
@@ -226,12 +213,13 @@ class _Section(QWidget):
         hdr_row.setContentsMargins(6, 3, 4, 3)
         hdr_row.setSpacing(4)
 
+        p = get_palette()
         if collapsible:
             self._arrow_btn = QPushButton("▼")
             self._arrow_btn.setFixedSize(14, 14)
             self._arrow_btn.setFlat(True)
             self._arrow_btn.setStyleSheet(
-                "color: #6d6d7a; font-size: 9px; background: transparent; border: none; padding: 0;"
+                f"color: {p['MUTED']}; font-size: 9px; background: transparent; border: none; padding: 0;"
             )
             self._arrow_btn.setCursor(Qt.CursorShape.PointingHandCursor)
             self._arrow_btn.clicked.connect(self._toggle_collapse)
@@ -242,7 +230,7 @@ class _Section(QWidget):
         title_lbl = QPushButton(title.upper())
         title_lbl.setFlat(True)
         title_lbl.setStyleSheet(
-            "color: #6d6d7a; font-size: 10px; font-weight: 600; letter-spacing: 0.8px;"
+            f"color: {p['MUTED']}; font-size: 10px; font-weight: 600; letter-spacing: 0.8px;"
             " background: transparent; border: none; text-align: left; padding: 0;"
         )
         if collapsible:
@@ -254,8 +242,8 @@ class _Section(QWidget):
         add_btn.setFixedSize(18, 18)
         add_btn.setFlat(True)
         add_btn.setStyleSheet(
-            "color: #6d6d7a; font-size: 14px; font-weight: 400; background: transparent; border: none; padding: 0;"
-            "QPushButton:hover { color: #edecee; }"
+            f"color: {p['MUTED']}; font-size: 14px; font-weight: 400; background: transparent; border: none; padding: 0;"
+            f"QPushButton:hover {{ color: {p['TEXT']}; }}"
         )
         add_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         add_btn.clicked.connect(
@@ -266,7 +254,7 @@ class _Section(QWidget):
         # Thin separator line above header
         sep = QFrame()
         sep.setFrameShape(QFrame.Shape.HLine)
-        sep.setStyleSheet("background: #252433; border: none; max-height: 1px;")
+        sep.setStyleSheet(f"background: {p['BG2H']}; border: none; max-height: 1px;")
         outer.addWidget(sep)
         outer.addWidget(hdr_widget)
 
@@ -340,18 +328,17 @@ class TagPanel(QWidget):
         self._all_btn.setCheckable(True)
         self._all_btn.setChecked(True)
         self._all_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        p = get_palette()
         self._all_btn.setStyleSheet(
-            "QPushButton {"
-            "  background: #21202e; color: #a277ff;"
-            "  border: none; border-bottom: 1px solid #292736;"
-            "  border-left: 3px solid #a277ff;"
-            "  text-align: left; padding: 8px 12px;"
-            "  font-size: 12px; font-weight: 700;"
-            "}"
-            "QPushButton:checked {"
-            "  background: #2a1f42; color: #a277ff;"
-            "}"
-            "QPushButton:hover { background: #252433; }"
+            f"QPushButton {{"
+            f"  background: {p['BG2']}; color: {p['ACCENT']};"
+            f"  border: none; border-bottom: 1px solid {p['BG3']};"
+            f"  border-left: 3px solid {p['ACCENT']};"
+            f"  text-align: left; padding: 8px 12px;"
+            f"  font-size: 12px; font-weight: 700;"
+            f"}}"
+            f"QPushButton:checked {{ background: {p['BG3']}; color: {p['ACCENT']}; }}"
+            f"QPushButton:hover {{ background: {p['BG2H']}; }}"
         )
         self._all_btn.clicked.connect(self._on_all_clicked)
         outer.addWidget(self._all_btn)
@@ -373,7 +360,7 @@ class TagPanel(QWidget):
 
         # Bottom action bar
         bar = QWidget()
-        bar.setStyleSheet("background: #1b1a23; border-top: 1px solid #292736;")
+        bar.setStyleSheet(f"background: {p['BG1']}; border-top: 1px solid {p['BG3']};")
         bar_row = QHBoxLayout(bar)
         bar_row.setContentsMargins(6, 4, 6, 4)
         bar_row.setSpacing(4)
@@ -385,9 +372,9 @@ class TagPanel(QWidget):
         ]:
             btn = QPushButton(label)
             btn.setStyleSheet(
-                "QPushButton { background: #21202e; color: #6d6d7a; border: 1px solid #292736;"
-                " padding: 3px 6px; font-size: 10px; font-weight: 600; }"
-                "QPushButton:hover { color: #edecee; border-color: #a277ff; }"
+                f"QPushButton {{ background: {p['BG2']}; color: {p['MUTED']}; border: 1px solid {p['BG3']};"
+                f" padding: 3px 6px; font-size: 10px; font-weight: 600; }}"
+                f"QPushButton:hover {{ color: {p['TEXT']}; border-color: {p['ACCENT']}; }}"
             )
             btn.clicked.connect(slot)
             bar_row.addWidget(btn)

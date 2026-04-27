@@ -20,6 +20,8 @@ from PyQt6.QtMultimediaWidgets import QVideoWidget
 from PyQt6.QtCore import Qt, QUrl, QTimer, QRectF, QEvent, QObject, QPoint
 from PyQt6.QtGui import QKeyEvent, QPainter, QColor, QPainterPath
 
+from teletag.ui.theme import get_palette
+
 _HIDE_DELAY_MS  = 3_000
 _BAR_H          = 56
 _BAR_MARGIN_BTM = 24
@@ -59,15 +61,10 @@ class _ControlsBar(QWidget):
 
         self._play_btn = QPushButton("⏸")
         self._play_btn.setFixedSize(36, 36)
-        self._play_btn.setStyleSheet("""
-            QPushButton {
-                background: transparent;
-                color: white;
-                border: none;
-                font-size: 20px;
-            }
-            QPushButton:hover { color: #6a8fd8; }
-        """)
+        self._play_btn.setStyleSheet(
+            f"QPushButton {{ background: transparent; color: white; border: none; font-size: 20px; }}"
+            f"QPushButton:hover {{ color: {get_palette()['ACCENT']}; }}"
+        )
         self._play_btn.clicked.connect(self.toggle_play)
         layout.addWidget(self._play_btn)
 
@@ -81,24 +78,11 @@ class _ControlsBar(QWidget):
 
         self._slider = QSlider(Qt.Orientation.Horizontal)
         self._slider.setRange(0, 10_000)
-        self._slider.setStyleSheet("""
-            QSlider::groove:horizontal {
-                height: 4px;
-                background: rgba(255,255,255,60);
-                border-radius: 0;
-            }
-            QSlider::sub-page:horizontal {
-                background: #6a8fd8;
-                border-radius: 0;
-            }
-            QSlider::handle:horizontal {
-                width: 14px;
-                height: 14px;
-                margin: -5px 0;
-                background: white;
-                border-radius: 0;
-            }
-        """)
+        self._slider.setStyleSheet(
+            "QSlider::groove:horizontal { height: 4px; background: rgba(255,255,255,60); border-radius: 0; }"
+            f"QSlider::sub-page:horizontal {{ background: {get_palette()['ACCENT']}; border-radius: 0; }}"
+            "QSlider::handle:horizontal { width: 14px; height: 14px; margin: -5px 0; background: white; border-radius: 0; }"
+        )
         self._slider.sliderMoved.connect(self._on_seek)
         layout.addWidget(self._slider)
 

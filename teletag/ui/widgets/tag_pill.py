@@ -8,18 +8,7 @@ on a very dark tinted background.  No border-radius (flat theme).
 from PyQt6.QtWidgets import QLabel
 from PyQt6.QtCore import Qt
 
-
-# (background, left-border / text) pairs — Aura-inspired palette
-_PILL_COLORS = [
-    ("#2a1f42", "#a277ff"),   # purple
-    ("#152e28", "#61ffca"),   # teal
-    ("#2e2010", "#ffca85"),   # orange
-    ("#2e1530", "#f694ff"),   # pink
-    ("#2e1515", "#ff6767"),   # red
-    ("#152033", "#82e2ff"),   # blue
-    ("#1a2e10", "#c3e88d"),   # green
-    ("#2e2a10", "#ffe073"),   # yellow
-]
+from teletag.ui.theme import pill_colors
 
 
 class TagPill(QLabel):
@@ -27,7 +16,7 @@ class TagPill(QLabel):
 
     def __init__(self, tag_name: str, parent=None) -> None:
         super().__init__(f"# {tag_name}", parent)
-        bg, fg = _PILL_COLORS[hash(tag_name) % len(_PILL_COLORS)]
+        bg, fg = pill_colors(tag_name)
         self.setStyleSheet(f"""
             QLabel {{
                 background-color: {bg};

@@ -28,15 +28,15 @@ from teletag.core.ingest import ingest_single
 from teletag.core.tags import get_tags_for_file, assign_tag
 from teletag.db.connection import get_connection
 from teletag.ui.widgets.tag_pill import TagPill
+from teletag.ui.theme import get_palette
 
 
 _EXT = {"hap": ".mov", "dxv": ".mov", "h264": ".mp4", "prores": ".mov", "webm": ".webm"}
-_STATUS_COLOR = {
-    "queued":  "#6d6d7a",
-    "running": "#6a8fd8",
-    "done":    "#4caf50",
-    "error":   "#e05252",
-}
+
+
+def _status_color(status: str) -> str:
+    p = get_palette()
+    return {"queued": p["MUTED"], "running": p["ACCENT"], "done": p["TEAL"], "error": p["DANGER"]}.get(status, p["MUTED"])
 
 
 # ---------------------------------------------------------------------------
@@ -138,10 +138,11 @@ class _JobRow(QFrame):
         name_lbl = QLabel(entry.filename)
         name_lbl.setStyleSheet("font-size: 12px;")
         top.addWidget(name_lbl, 1)
+        _p = get_palette()
         badge = QLabel(entry.preset.upper())
         badge.setStyleSheet(
-            "font-size: 10px; padding: 1px 6px;"
-            "background: #2a2938; border-radius: 3px; color: #a0a0b8;"
+            f"font-size: 10px; padding: 1px 6px;"
+            f"background: {_p['BG3']}; border-radius: 3px; color: {_p['TEXT2']};"
         )
         top.addWidget(badge)
         layout.addLayout(top)
@@ -155,23 +156,23 @@ class _JobRow(QFrame):
         self._bar.setFixedHeight(5)
         self._bar.setTextVisible(False)
         self._bar.setStyleSheet(
-            "QProgressBar { background: #2a2938; border-radius: 2px; }"
-            f"QProgressBar::chunk {{ background: {_STATUS_COLOR['queued']}; border-radius: 2px; }}"
+            f"QProgressBar {{ background: {_p['BG3']}; border-radius: 2px; }}"
+            f"QProgressBar::chunk {{ background: {_status_color('queued')}; border-radius: 2px; }}"
         )
         bot.addWidget(self._bar, 1)
         self._status_lbl = QLabel("queued")
         self._status_lbl.setFixedWidth(44)
         self._status_lbl.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-        self._status_lbl.setStyleSheet(f"font-size: 10px; color: {_STATUS_COLOR['queued']};")
+        self._status_lbl.setStyleSheet(f"font-size: 10px; color: {_status_color('queued')};")
         bot.addWidget(self._status_lbl)
         layout.addLayout(bot)
 
         self._highlight(False)
 
     def update_status(self, status: str, progress: float = 0.0, msg: str = "") -> None:
-        c = _STATUS_COLOR.get(status, "#6d6d7a")
+        c = _status_color(status)
         self._bar.setStyleSheet(
-            "QProgressBar { background: #2a2938; border-radius: 2px; }"
+            f"QProgressBar {{ background: {get_palette()['BG3']}; border-radius: 2px; }}"
             f"QProgressBar::chunk {{ background: {c}; border-radius: 2px; }}"
         )
         if status == "running":
@@ -193,7 +194,7 @@ class _JobRow(QFrame):
 
     def _highlight(self, on: bool) -> None:
         self.setStyleSheet(
-            "QFrame { background: #2d2c3a; border-radius: 4px; }" if on
+            f"QFrame {{ background: {get_palette()['BG3']}; border-radius: 4px; }}" if on
             else "QFrame { background: transparent; }"
         )
 
@@ -361,15 +362,16 @@ class ConvertPanel(QWidget):
         self._rename_edit.setToolTip(
             "Variables: {name} original stem, {preset}, {w}, {h}, {scale}"
         )
+        _sp = get_palette()
         hint = QLabel("  {name}  {preset}  {w}  {h}  {scale}")
-        hint.setStyleSheet("color: #6d6d7a; font-size: 10px;")
+        hint.setStyleSheet(f"color: {_sp['MUTED']}; font-size: 10px;")
         layout.addWidget(self._rename_edit)
         layout.addWidget(hint)
 
         self._dxv_note = QLabel(
             "⚠ DXV requires the Resolume codec installed on this machine."
         )
-        self._dxv_note.setStyleSheet("color: #e0a030; font-size: 11px;")
+        self._dxv_note.setStyleSheet(f"color: {_sp['ORANGE']}; font-size: 11px;")
         self._dxv_note.setWordWrap(True)
         self._dxv_note.hide()
         layout.addWidget(self._dxv_note)
@@ -382,18 +384,18 @@ class ConvertPanel(QWidget):
         # Queue controls
         self._start_btn = QPushButton("▶  Start Queue")
         self._start_btn.setStyleSheet(
-            "QPushButton { background: #2a4a2a; color: #4caf50; border-radius: 4px; padding: 6px; font-weight: bold; }"
-            "QPushButton:hover { background: #2e5a2e; }"
-            "QPushButton:disabled { color: #444; background: #1e1e2a; }"
+            f"QPushButton {{ background: {_sp['BG2']}; color: {_sp['TEAL']}; border: 1px solid {_sp['TEAL']}; border-radius: 4px; padding: 6px; font-weight: bold; }}"
+            f"QPushButton:hover {{ background: {_sp['BG3']}; }}"
+            f"QPushButton:disabled {{ color: {_sp['MUTED']}; background: {_sp['BG1']}; border-color: {_sp['BG3']}; }}"
         )
         self._start_btn.clicked.connect(self._start_queue)
         layout.addWidget(self._start_btn)
 
         self._stop_btn = QPushButton("■  Stop")
         self._stop_btn.setStyleSheet(
-            "QPushButton { background: #4a2a2a; color: #e05252; border-radius: 4px; padding: 6px; font-weight: bold; }"
-            "QPushButton:hover { background: #5a2e2e; }"
-            "QPushButton:disabled { color: #444; background: #1e1e2a; }"
+            f"QPushButton {{ background: {_sp['BG2']}; color: {_sp['DANGER']}; border: 1px solid {_sp['DANGER']}; border-radius: 4px; padding: 6px; font-weight: bold; }}"
+            f"QPushButton:hover {{ background: {_sp['BG3']}; }}"
+            f"QPushButton:disabled {{ color: {_sp['MUTED']}; background: {_sp['BG1']}; border-color: {_sp['BG3']}; }}"
         )
         self._stop_btn.setEnabled(False)
         self._stop_btn.clicked.connect(self._stop_queue)
@@ -405,7 +407,7 @@ class ConvertPanel(QWidget):
         layout.addWidget(sep2)
 
         self._progress_lbl = QLabel("No jobs running")
-        self._progress_lbl.setStyleSheet("color: #6d6d7a; font-size: 11px;")
+        self._progress_lbl.setStyleSheet(f"color: {_sp['MUTED']}; font-size: 11px;")
         layout.addWidget(self._progress_lbl)
 
         self._current_bar = QProgressBar()
@@ -428,14 +430,14 @@ class ConvertPanel(QWidget):
         self._log_view.setReadOnly(True)
         self._log_view.setLineWrapMode(QPlainTextEdit.LineWrapMode.NoWrap)
         self._log_view.setStyleSheet(
-            "QPlainTextEdit {"
-            "  background: #0d0d14;"
-            "  color: #c0c0d0;"
-            "  font-family: Consolas, 'Courier New', monospace;"
-            "  font-size: 11px;"
-            "  border: 1px solid #2a2938;"
-            "  border-radius: 4px;"
-            "}"
+            f"QPlainTextEdit {{"
+            f"  background: {_sp['BG0']};"
+            f"  color: {_sp['TEXT2']};"
+            f"  font-family: Consolas, 'Courier New', monospace;"
+            f"  font-size: 11px;"
+            f"  border: 1px solid {_sp['BG3']};"
+            f"  border-radius: 4px;"
+            f"}}"
         )
         self._log_view.setMaximumBlockCount(2000)
         layout.addWidget(self._log_view, 1)
@@ -465,7 +467,7 @@ class ConvertPanel(QWidget):
         self._info_labels: dict[str, QLabel] = {}
         for row, key in enumerate(["Name", "Duration", "Resolution", "Codec", "Path"]):
             lk = QLabel(key + ":")
-            lk.setStyleSheet("color: #6d6d7a; font-size: 11px;")
+            lk.setStyleSheet(f"color: {get_palette()['MUTED']}; font-size: 11px;")
             lv = QLabel("—")
             lv.setWordWrap(True)
             lv.setStyleSheet("font-size: 11px;")

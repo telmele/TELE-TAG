@@ -30,7 +30,7 @@ from teletag.core.tags import get_descendant_ids, get_tags_for_library, assign_t
 from teletag.core.ingest import extract_thumbnail
 from teletag.ui.widgets.thumbnail import ThumbnailWidget
 from teletag.ui.widgets.tag_pill import TagPill
-from teletag.ui.theme import card_style
+from teletag.ui.theme import card_style, get_palette
 
 _CARD_W = 220
 _CARD_SPACING = 12
@@ -304,8 +304,9 @@ class GridPanel(QWidget):
 
         # ── Filter bar ────────────────────────────────────────────────
         self._filter_bar = QWidget()
+        p = get_palette()
         self._filter_bar.setStyleSheet(
-            "background: #16161f; border-bottom: 1px solid #2a2938;"
+            f"background: {p['BG0']}; border-bottom: 1px solid {p['BG3']};"
         )
         fb = QHBoxLayout(self._filter_bar)
         fb.setContentsMargins(8, 4, 8, 4)
@@ -313,7 +314,7 @@ class GridPanel(QWidget):
 
         def _flbl(text: str) -> QLabel:
             lbl = QLabel(text)
-            lbl.setStyleSheet("font-size: 11px; color: #6d6d7a; background: transparent;")
+            lbl.setStyleSheet(f"font-size: 11px; color: {p['MUTED']}; background: transparent;")
             return lbl
 
         fb.addWidget(_flbl("Resolution:"))
@@ -357,7 +358,7 @@ class GridPanel(QWidget):
 
         sep = QFrame()
         sep.setFrameShape(QFrame.Shape.VLine)
-        sep.setStyleSheet("background: #2a2938; max-width: 1px; margin: 3px 2px;")
+        sep.setStyleSheet(f"background: {p['BG3']}; max-width: 1px; margin: 3px 2px;")
         fb.addWidget(sep)
 
         self._btn_folders = QPushButton("📁 Folders")
@@ -560,12 +561,13 @@ class GridPanel(QWidget):
                         grow += 1
                         gcol = 0
                     indent = 6 + depth * 16
+                    _p = get_palette()
                     hdr = QLabel(f"📁  {name}")
                     hdr.setFixedHeight(28)
                     hdr.setStyleSheet(
-                        f"background: #21202e; color: #6d6d7a; font-size: 11px;"
+                        f"background: {_p['BG2']}; color: {_p['MUTED']}; font-size: 11px;"
                         f" font-weight: 600; letter-spacing: 0.4px;"
-                        f" border-bottom: 1px solid #292736; padding-left: {indent}px;"
+                        f" border-bottom: 1px solid {_p['BG3']}; padding-left: {indent}px;"
                     )
                     self._grid.addWidget(hdr, grow, 0, 1, cols)
                     grow += 1
@@ -679,8 +681,9 @@ class GridPanel(QWidget):
         else:
             row_data.extend(("file", fd, tgs) for fd, tgs in files)
 
-        _folder_bg = QBrush(QColor("#21202e"))
-        _folder_fg = QBrush(QColor("#6d6d7a"))
+        _fp = get_palette()
+        _folder_bg = QBrush(QColor(_fp["BG2"]))
+        _folder_fg = QBrush(QColor(_fp["MUTED"]))
         _folder_font = QFont()
         _folder_font.setBold(True)
         _folder_font.setPointSize(9)

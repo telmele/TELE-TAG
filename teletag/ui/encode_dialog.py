@@ -18,6 +18,7 @@ from PyQt6.QtCore import Qt, pyqtSignal, QObject
 from teletag.core.encode import PRESETS, SCALE_MODES, create_job, run_encode_job
 from teletag.core.library import Library
 from teletag.db.connection import get_connection
+from teletag.ui.theme import get_palette
 
 
 class _EncodeSignals(QObject):
@@ -62,7 +63,7 @@ class EncodeDialog(QDialog):
         self._dxv_note = QLabel(
             "⚠ DXV requires Resolume Avenue / Arena codec installed on this machine."
         )
-        self._dxv_note.setStyleSheet("color: #e0a030; font-size: 11px;")
+        self._dxv_note.setStyleSheet(f"color: {get_palette()['ORANGE']}; font-size: 11px;")
         self._dxv_note.setWordWrap(True)
         self._dxv_note.hide()
         layout.addWidget(self._dxv_note)

@@ -2,7 +2,7 @@
 
 **A local video library manager built for VJs.**
 
-Organize, tag, and re-encode your video assets — HAP, H.264, ProRes, WebM — without leaving your desktop. No cloud, no subscription, no telemetry. Everything lives in a single SQLite file next to your footage.
+Organize, tag, and re-encode your video assets — DXV, HAP, H.264, ProRes, WebM — without leaving your desktop. Everything lives in a single SQLite file next to your libraries.
 
 ---
 
@@ -21,8 +21,6 @@ Organize, tag, and re-encode your video assets — HAP, H.264, ProRes, WebM — 
 ---
 
 ## Download
-
-Pre-built binaries (FFmpeg included) are attached to every [GitHub Release](../../releases/latest).
 
 | Platform | File |
 |---|---|

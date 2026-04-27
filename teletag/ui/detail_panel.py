@@ -21,6 +21,7 @@ from teletag.core.library import Library
 from teletag.core.tags import get_tags_for_library, get_tags_for_file
 from teletag.ui.widgets.tag_pill import TagPill
 from teletag.ui.grid_panel import reveal_in_explorer
+from teletag.ui.theme import get_palette
 
 
 class _PathLabel(QLabel):
@@ -62,9 +63,10 @@ class _MiniPlayer(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(3)
 
+        p = get_palette()
         self._video = QVideoWidget()
         self._video.setFixedHeight(120)
-        self._video.setStyleSheet("background: #0d0d14;")
+        self._video.setStyleSheet(f"background: {p['BG0']};")
         layout.addWidget(self._video)
 
         controls = QHBoxLayout()
@@ -74,8 +76,8 @@ class _MiniPlayer(QWidget):
         self._play_btn = QPushButton("▶")
         self._play_btn.setFixedSize(24, 24)
         self._play_btn.setStyleSheet(
-            "QPushButton { background: transparent; color: #c0c0d0; border: none; font-size: 12px; }"
-            "QPushButton:hover { color: #ffffff; }"
+            f"QPushButton {{ background: transparent; color: {p['TEXT2']}; border: none; font-size: 12px; }}"
+            f"QPushButton:hover {{ color: {p['TEXT']}; }}"
         )
         self._play_btn.clicked.connect(self._toggle_play)
         controls.addWidget(self._play_btn)
@@ -83,10 +85,10 @@ class _MiniPlayer(QWidget):
         self._slider = QSlider(Qt.Orientation.Horizontal)
         self._slider.setRange(0, 1000)
         self._slider.setStyleSheet(
-            "QSlider::groove:horizontal { height: 3px; background: #2a2938; border-radius: 1px; }"
-            "QSlider::sub-page:horizontal { background: #6a8fd8; border-radius: 1px; }"
-            "QSlider::handle:horizontal { width: 10px; height: 10px; margin: -3px 0;"
-            " background: #c0c0d0; border-radius: 5px; }"
+            f"QSlider::groove:horizontal {{ height: 3px; background: {p['BG3']}; border-radius: 1px; }}"
+            f"QSlider::sub-page:horizontal {{ background: {p['ACCENT']}; border-radius: 1px; }}"
+            f"QSlider::handle:horizontal {{ width: 10px; height: 10px; margin: -3px 0;"
+            f" background: {p['TEXT2']}; border-radius: 5px; }}"
         )
         self._slider.sliderMoved.connect(self._on_seek)
         controls.addWidget(self._slider, 1)
@@ -173,7 +175,7 @@ class DetailPanel(QWidget):
         self._path_label = _PathLabel()
         for row, key in enumerate(["Name", "Duration", "Resolution", "Codec", "Path"]):
             lbl_key = QLabel(key + ":")
-            lbl_key.setStyleSheet("color: #6d6d7a; font-size: 11px;")
+            lbl_key.setStyleSheet(f"color: {get_palette()['MUTED']}; font-size: 11px;")
             if key == "Path":
                 lbl_val = self._path_label
             else:

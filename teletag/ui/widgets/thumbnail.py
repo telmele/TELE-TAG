@@ -12,6 +12,8 @@ from PyQt6.QtWidgets import QLabel, QWidget, QSizePolicy
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QPixmap
 
+from teletag.ui.theme import get_palette
+
 _THUMB_H = 120   # fixed height; width comes from the layout
 
 
@@ -29,7 +31,7 @@ class ThumbnailWidget(QLabel):
         self.setFixedHeight(_THUMB_H)
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.setStyleSheet("background-color: #15141b; border-radius: 0;")
+        self.setStyleSheet(f"background-color: {get_palette()['BG0']}; border-radius: 0;")
         self.setText("⏳")
 
     def showEvent(self, event) -> None:  # type: ignore[override]

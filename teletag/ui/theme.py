@@ -381,6 +381,22 @@ def _make_qss(palette: dict) -> str:
     return qss
 
 
+def get_palette() -> dict:
+    """Return the currently active theme palette."""
+    return _active_palette
+
+
+def pill_colors(tag_name: str) -> tuple[str, str]:
+    """Return (bg_css, fg_css) for a tag pill, derived from the active theme."""
+    p = _active_palette
+    fgs = [p["ACCENT"], p["TEAL"], p["ORANGE"], p["PINK"], p["DANGER"],
+           "#82e2ff", "#c3e88d", "#ffe073"]
+    fg = fgs[hash(tag_name) % len(fgs)]
+    h = fg.lstrip("#")
+    r, g, b = int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
+    return f"rgba({r}, {g}, {b}, 40)", fg
+
+
 def apply_theme(app: QApplication, name: str = "Aura") -> None:
     global _active_palette
     palette = THEMES.get(name, THEMES["Aura"])
